@@ -125,15 +125,6 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
               </div>
             }
           </section>
-
-          <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 class="text-lg font-bold text-slate-950">Admin Boundaries</h2>
-            <div class="mt-4 space-y-3 text-sm text-slate-600">
-              <p class="rounded-lg bg-slate-50 border border-slate-200 p-3">Shopping cart and checkout are customer-only routes.</p>
-              <p class="rounded-lg bg-slate-50 border border-slate-200 p-3">Admins update products, categories, orders, reports, and staff access.</p>
-              <p class="rounded-lg bg-slate-50 border border-slate-200 p-3">Order placement remains with customer accounts only.</p>
-            </div>
-          </section>
         </div>
       }
     </div>
