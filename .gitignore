@@ -1,0 +1,60 @@
+# Eclipse workspace metadata
+/.metadata/
+
+# SonarLint
+.sonarlint/
+
+# Local environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Maven build output
+**/target/
+
+# Logs
+**/logs/
+**/*.log
+**/*.log.*.gz
+**/compile.log
+
+# Runtime uploads
+**/uploads/
+
+# Eclipse IDE files
+**/.settings/
+**/.classpath
+**/.project
+**/.factorypath
+**/.springBeans
+**/*.launch
+
+# Angular cache
+sprint-frontend/.angular/
+
+# Local scripts and seed files
+seed-*.sql
+seed-*.bat
+seed-*.sh
+create-databases.sql
+verify-setup.bat
+init-databases.bat
+init-databases.sh
+rebuild-admin-service.bat
+rebuild-admin-service.sh
+docker-manage.bat
+docker-manage.sh
+payment-service/start-payment.bat
+
+# Internal fix/setup docs
+ADMIN_PANEL_FIXES.md
+ADMIN_PANEL_FIX_SUMMARY.md
+COMPLETE_FIX_GUIDE.md
+FIXES_APPLIED.md
+README_ADMIN_FIX.md
+SEPARATE_DATABASES.md
+DOCKER_SETUP.md
+
+# OS files
+.DS_Store
+Thumbs.db

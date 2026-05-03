@@ -1,0 +1,473 @@
+version: '3.8'
+
+services:
+  # Infrastructure Services
+  rabbitmq:
+    image: rabbitmq:4.0.4-management
+    container_name: sprint_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - sprint_net
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: sprint_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - sprint_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  postgres-auth:
+    image: postgres:15
+    container_name: sprint_postgres_auth
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+    networks:
+      - sprint_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-payment:
+    image: postgres:15
+    container_name: sprint_postgres_payment
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_payment_data:/var/lib/postgresql/data
+    networks:
+      - sprint_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d payment_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-order:
+    image: postgres:15
+    container_name: sprint_postgres_order
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_order_data:/var/lib/postgresql/data
+    networks:
+      - sprint_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d order_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-catalog:
+    image: postgres:15
+    container_name: sprint_postgres_catalog
+    environment:
+      POSTGRES_DB: catalog_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_catalog_data:/var/lib/postgresql/data
+    networks:
+      - sprint_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d catalog_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-admin:
+    image: postgres:15
+    container_name: sprint_postgres_admin
+    environment:
+      POSTGRES_DB: admin_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres_admin_data:/var/lib/postgresql/data
+    networks:
+      - sprint_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d admin_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-notification:
+    image: postgres:15
+    container_name: sprint_postgres_notification
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "5437:5432"
+    volumes:
+      - postgres_notification_data:/var/lib/postgresql/data
+    networks:
+      - sprint_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d notification_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Service Discovery
+  eureka-server:
+    image: avnigarg22/sprint-eureka-server:latest
+    container_name: sprint_eureka
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - sprint_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  # Configuration Server
+  config-server:
+    image: avnigarg22/sprint-config-server:latest
+    container_name: sprint_config
+    ports:
+      - "8888:8888"
+    networks:
+      - sprint_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  # Microservices
+  auth-service:
+    image: avnigarg22/sprint-auth-service:latest
+    container_name: sprint_auth
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-auth:5432/auth_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - JWT_SECRET=sprint-secret-key-shared-across-all-microservices-2024
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - SPRINGDOC_API_DOCS_ENABLED=true
+      - SPRINGDOC_API_DOCS_PATH=/v3/api-docs
+      - SPRINGDOC_SWAGGER_UI_ENABLED=true
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    networks:
+      - sprint_net
+
+  payment-service:
+    image: avnigarg22/sprint-payment-service:latest
+    container_name: sprint_payment
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-payment:5432/payment_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - SPRINGDOC_API_DOCS_ENABLED=true
+      - SPRINGDOC_API_DOCS_PATH=/v3/api-docs
+      - SPRINGDOC_SWAGGER_UI_ENABLED=true
+    depends_on:
+      postgres-payment:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    networks:
+      - sprint_net
+
+  order-service:
+    image: avnigarg22/sprint-order-service:latest
+    container_name: sprint_order
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-order:5432/order_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - JWT_SECRET=sprint-secret-key-shared-across-all-microservices-2024
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - SPRINGDOC_API_DOCS_ENABLED=true
+      - SPRINGDOC_API_DOCS_PATH=/v3/api-docs
+      - SPRINGDOC_SWAGGER_UI_ENABLED=true
+    depends_on:
+      postgres-order:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      payment-service:
+        condition: service_started
+    networks:
+      - sprint_net
+
+  catalog-service:
+    image: avnigarg22/sprint-catalog-service:latest
+    container_name: sprint_catalog
+    ports:
+      - "8084:8084"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-catalog:5432/catalog_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - SPRINGDOC_API_DOCS_ENABLED=true
+      - SPRINGDOC_API_DOCS_PATH=/v3/api-docs
+      - SPRINGDOC_SWAGGER_UI_ENABLED=true
+    depends_on:
+      postgres-catalog:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    networks:
+      - sprint_net
+
+  api-gateway:
+    image: avnigarg22/sprint-api-gateway:latest
+    container_name: sprint_gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - eureka.client.service-url.defaultZone=http://eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true
+      - SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_LOWER_CASE_SERVICE_ID=true
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      order-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      catalog-service:
+        condition: service_started
+    networks:
+      - sprint_net
+
+  admin-service:
+    image: avnigarg22/sprint-admin-service:latest
+    container_name: sprint_admin
+    ports:
+      - "8085:8085"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-admin:5432/admin_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - JWT_SECRET=sprint-secret-key-shared-across-all-microservices-2024
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - SPRINGDOC_API_DOCS_ENABLED=true
+      - SPRINGDOC_API_DOCS_PATH=/v3/api-docs
+      - SPRINGDOC_SWAGGER_UI_ENABLED=true
+    depends_on:
+      postgres-admin:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    networks:
+      - sprint_net
+
+  notification-service:
+    image: avnigarg22/sprint-notification-service:latest
+    container_name: sprint_notification
+    ports:
+      - "8086:8086"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-notification:5432/notification_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - JWT_SECRET=sprint-secret-key-shared-across-all-microservices-2024
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - SPRINGDOC_API_DOCS_ENABLED=true
+      - SPRINGDOC_API_DOCS_PATH=/v3/api-docs
+      - SPRINGDOC_SWAGGER_UI_ENABLED=true
+    depends_on:
+      postgres-notification:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    networks:
+      - sprint_net
+
+  # Monitoring
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: sprint_zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - sprint_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9411/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_auth_data:
+  postgres_payment_data:
+  postgres_order_data:
+  postgres_catalog_data:
+  postgres_admin_data:
+  postgres_notification_data:
+  rabbitmq_data:
+
+networks:
+  sprint_net:
+    driver: bridge
