@@ -7,7 +7,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.mockito.Mockito.*;
+import java.util.Map;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class RabbitConsumerTest {
@@ -20,19 +23,37 @@ class RabbitConsumerTest {
 
     @Test
     void consume_ShouldCallNotificationService() {
-        rabbitConsumer.consume("Order 1 has been CONFIRMED");
-        verify(notificationService).processNotification("Order 1 has been CONFIRMED");
+        Map<String, Object> payload = Map.of(
+            "recipientType", "USER",
+            "recipientId", 1L,
+            "title", "Order Confirmed",
+            "message", "Order 1 has been CONFIRMED",
+            "type", "ORDER_CONFIRMED",
+            "orderId", 1L,
+            "status", "CONFIRMED"
+        );
+        rabbitConsumer.consume(payload);
+        verify(notificationService).create(any());
     }
 
     @Test
-    void consume_ShouldHandleEmptyMessage() {
-        rabbitConsumer.consume("");
-        verify(notificationService).processNotification("");
+    void consume_ShouldHandleEmptyPayload() {
+        rabbitConsumer.consume(Map.of());
+        verify(notificationService).create(any());
     }
 
     @Test
-    void consume_ShouldHandleCancelledMessage() {
-        rabbitConsumer.consume("Order 2 has been CANCELLED");
-        verify(notificationService).processNotification("Order 2 has been CANCELLED");
+    void consume_ShouldHandleCancelledOrder() {
+        Map<String, Object> payload = Map.of(
+            "recipientType", "USER",
+            "recipientId", 2L,
+            "title", "Order Cancelled",
+            "message", "Order 2 has been CANCELLED",
+            "type", "ORDER_CANCELLED",
+            "orderId", 2L,
+            "status", "CANCELLED"
+        );
+        rabbitConsumer.consume(payload);
+        verify(notificationService).create(any());
     }
 }
