@@ -16,8 +16,12 @@ public class CorsConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOriginPatterns(List.of(
                 "http://localhost:4200",
-                "http://localhost:3000",
-                "http://127.0.0.1:4200"
+                "http://localhost:80",
+                "http://localhost",
+                "http://127.0.0.1:4200",
+                "http://127.0.0.1",
+                "http://sprint_frontend",
+                "http://sprint_frontend:80"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
