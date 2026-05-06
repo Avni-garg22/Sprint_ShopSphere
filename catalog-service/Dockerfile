@@ -1,5 +1,10 @@
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:21-jdk-jammy
 WORKDIR /app
-COPY target/catalog-service-0.0.1-SNAPSHOT.jar app.jar
+COPY mvnw .
+COPY mvnw.cmd .
+COPY .mvn .mvn
+COPY pom.xml .
+COPY src src
+RUN chmod +x mvnw && ./mvnw clean package -DskipTests
 EXPOSE 8084
-CMD ["java", "-jar", "app.jar"]
+CMD ["java", "-jar", "target/catalog-service-0.0.1-SNAPSHOT.jar"]
